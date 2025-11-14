@@ -23,6 +23,10 @@ RUN apt-get update \
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
+
+RUN mkdir -p logs
+RUN chown -R appuser:appuser logs
+
 # Copy the rest of the application code
 COPY . .
 
