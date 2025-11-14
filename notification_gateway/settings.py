@@ -19,7 +19,8 @@ from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
 
 
 
@@ -203,7 +204,7 @@ LOGGING = {
         'file': {
             'level': 'INFO', 
             'class': 'logging.FileHandler', 
-            'filename': 'logs/app.log', 
+            'filename': os.path.join(LOG_DIR, 'app.log'), 
             'formatter': 'verbose', 
             'filters': ['correlation_id'], 
         },
