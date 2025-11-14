@@ -1,0 +1,43 @@
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Copy the requirements file first to leverage Docker cache layers
+COPY requirements.txt .
+
+# Install system dependencies required by some Python packages (like psycopg2-binary, redis hiredis cluster)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        libpq-dev \
+        python3-dev \
+        redis-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
+
+# Copy the rest of the application code
+COPY . .
+
+# Collect static files (optional, might not be needed for pure API)
+# RUN python manage.py collectstatic --noinput
+
+# Create a non-root user and group (optional but recommended for security)
+RUN adduser --disabled-password --gecos '' appuser
+RUN chown -R appuser:appuser /app
+USER appuser
+
+# Expose the port the app runs on (Railway usually provides PORT env var)
+# If the app binds to 0.0.0.0, it will listen on all interfaces.
+# The specific port (e.g., 8000) is often overridden by the PORT environment variable provided by Railway.
+EXPOSE $PORT
+
+# Command to run the application using Uvicorn ASGI server
+CMD ["sh", "-c", "uvicorn notification_gateway.asgi:application --host 0.0.0.0 --port $PORT"]
