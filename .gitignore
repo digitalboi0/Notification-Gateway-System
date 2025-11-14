@@ -14,7 +14,7 @@ ENV/
 *.egg
 
 # Django stuff:
-*.log
+
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -40,7 +40,7 @@ ehthumbs.db
 Thumbs.db
 
 # Logs
-logs/
+
 
 # Secrets 
 secret_key.txt
