@@ -1,28 +1,57 @@
+
+
 FROM python:3.11-slim
+
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
+
+
 WORKDIR /app
 
+
 COPY requirements.txt .
+
+
+
 RUN apt-get update \
- && apt-get install -y --no-install-recommends build-essential libpq-dev python3-dev redis-tools \
- && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        libpq-dev \
+        python3-dev \
+        redis-tools \
+    && rm -rf /var/lib/apt/lists/*
+
 
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-# Create non-root user first
-RUN adduser --disabled-password --gecos '' appuser
 
-# Copy app early (so chmod affects app files)
 COPY . .
 
-# Create logs and set ownership
-RUN mkdir -p /app/logs \
- && chown -R appuser:appuser /app/logs /app
 
-USER appuser
+RUN mkdir -p logs
 
-EXPOSE $PORT
-CMD ["sh", "-c", "uvicorn notification_gateway.asgi:application --host 0.0.0.0 --port $PORT"]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPOSE 8000
+
+
+
+
+
+
+CMD ["sh", "-c", "uvicorn notification_gateway.asgi:application --host 0.0.0.0 --port 8000"]
