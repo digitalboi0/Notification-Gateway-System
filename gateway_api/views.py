@@ -1796,3 +1796,244 @@ class InternalOrganizationSyncView(AsyncAPIView):
 
  
     
+
+class TemplateDocsProxyView(APIView):
+    """
+    Proxy view to forward requests to the Template Service's Swagger UI.
+    Adds the required X-Internal-Secret header for the template service's internal endpoints.
+    Intended for internal access (e.g., by developers/admins via the gateway).
+    """
+
+    authentication_classes = [] 
+    permission_classes = []          
+
+    def get(self, request, path=''):
+        """
+        Proxy GET requests to the template service's documentation endpoint.
+        Adds X-Internal-Secret header for the *template service's* internal auth.
+        Preserves response status, headers, and content.
+        """
+        
+        template_service_base_url = settings.TEMPLATE_SERVICE_URL.rstrip('/') 
+        
+        path_segment = f"/{path.lstrip('/')}" if path else "/"
+        target_url = f"{template_service_base_url}{path_segment}"
+
+        logger.info(f"Proxying GET request to template docs: {target_url}")
+
+        try:
+            
+            
+            proxy_headers = {
+                'X-Internal-Secret': settings.INTERNAL_API_SECRET, 
+                
+                'User-Agent': request.META.get('HTTP_USER_AGENT', 'Django-Notification-Gateway-Proxy'),
+                
+                'Accept': request.META.get('HTTP_ACCEPT', '*/*'),
+                
+                
+            }
+
+            response = requests.get(
+                target_url,
+                headers=proxy_headers,
+                
+                stream=True,
+                timeout=10 
+            )
+            
+            
+
+            
+            content_type = response.headers.get('Content-Type', 'application/octet-stream')
+
+            
+            content = b"" 
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk: 
+                    content += chunk
+
+            
+            return Response(
+                content, 
+                status=response.status_code, 
+                content_type=content_type 
+            )
+
+        except requests.RequestException as e:
+            logger.error(f"Error proxying request to template docs ({target_url}): {e}")
+            
+            return Response(
+                {'error': 'Template service documentation unavailable', 'details': str(e)},
+                status=http_status.HTTP_502_BAD_GATEWAY
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error in TemplateDocsProxyView: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Internal server error in proxy'},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def post(self, request, path=''):
+        """
+        Proxy POST requests (e.g., for Swagger UI's 'Try it out' feature).
+        Adds X-Internal-Secret header for template service internal auth.
+        Preserves response status, headers, and content.
+        """
+        
+        template_service_base_url = settings.TEMPLATE_SERVICE_URL.rstrip('/')
+        path_segment = f"/{path.lstrip('/')}" if path else "/"
+        target_url = f"{template_service_base_url}{path_segment}"
+
+        logger.info(f"Proxying POST request to template service: {target_url}")
+
+        try:
+            
+            
+            proxy_headers = {
+                'X-Internal-Secret': settings.INTERNAL_API_SECRET, 
+                'Content-Type': request.content_type, 
+                'User-Agent': request.META.get('HTTP_USER_AGENT', 'Django-Notification-Gateway-Proxy'),
+                
+                
+            }
+
+            response = requests.post(
+                target_url,
+                json=request.data, 
+                headers=proxy_headers,
+                stream=True,
+                timeout=10
+            )
+            
+
+            content_type = response.headers.get('Content-Type', 'application/octet-stream')
+            content = b""
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    content += chunk
+
+            return Response(
+                content,
+                status=response.status_code,
+                content_type=content_type
+            )
+
+        except requests.RequestException as e:
+            logger.error(f"Error proxying POST request to template service ({target_url}): {e}")
+            return Response(
+                {'error': 'Template service unavailable for the requested action', 'details': str(e)},
+                status=http_status.HTTP_502_BAD_GATEWAY
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error in TemplateDocsProxyView POST: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Internal server error in proxy'},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from rest_framework.views import APIView
+import requests
+from urllib.parse import unquote, urljoin
+import logging
+
+
+
+class TemplateDocsProxyView(APIView):
+    """
+    Proxy view for Template Service docs.
+    - GET /template-docs/            -> redirects to /template-docs/api/docs/
+    - GET /template-docs/<path>      -> proxies to settings.TEMPLATE_SERVICE_URL/<path>
+    - If the requested path (after cleaning) is an absolute URL (http/https),
+      redirect the client to that URL (so CDN assets load directly).
+    """
+
+    authentication_classes = []
+    permission_classes = []
+
+    def _clean_path(self, path: str) -> str:
+        
+        if path is None:
+            return ''
+        cleaned = unquote(path)
+        
+        cleaned = cleaned.strip().strip('"').strip("'")
+        return cleaned
+
+    def _proxy_request(self, request, target_url, method='GET', data=None):
+        headers = {
+            'X-Internal-Secret': getattr(settings, 'INTERNAL_API_SECRET', ''),
+            'User-Agent': request.META.get('HTTP_USER_AGENT', 'Django-Notification-Gateway-Proxy'),
+            'Accept': request.META.get('HTTP_ACCEPT', '*/*'),
+        }
+
+        try:
+            if method == 'GET':
+                resp = requests.get(target_url, headers=headers, params=request.GET, stream=True, timeout=10)
+            else:
+                resp = requests.post(target_url, headers=headers, json=data, stream=True, timeout=10)
+        except requests.RequestException as e:
+            logger.error("Error proxying request to template service %s: %s", target_url, e, exc_info=True)
+            return None, e
+
+        
+        content = b''
+        for chunk in resp.iter_content(chunk_size=8192):
+            if chunk:
+                content += chunk
+
+        return resp, content
+
+    def get(self, request, path=''):
+        
+        if not path:
+            
+            
+            return HttpResponseRedirect(request.path + 'api/docs/')
+
+        cleaned = self._clean_path(path)
+
+        
+        if cleaned.startswith('http://') or cleaned.startswith('https://'):
+            logger.info("Redirecting client to external URL from proxy: %s", cleaned)
+            return HttpResponseRedirect(cleaned)
+
+        
+        base = getattr(settings, 'TEMPLATE_SERVICE_URL', 'http://localhost:8002').rstrip('/')
+        target_url = urljoin(base + '/', cleaned.lstrip('/'))  
+        logger.info("Proxying GET request to template docs: %s", target_url)
+
+        resp, content_or_error = self._proxy_request(request, target_url, method='GET')
+        if resp is None:
+            return JsonResponse(
+                {'error': 'Template service documentation unavailable', 'details': str(content_or_error)},
+                status=502
+            )
+
+        content_type = resp.headers.get('Content-Type', 'application/octet-stream')
+        return HttpResponse(content_or_error, status=resp.status_code, content_type=content_type)
+
+    def post(self, request, path=''):
+        cleaned = self._clean_path(path)
+        base = getattr(settings, 'TEMPLATE_SERVICE_URL', 'http://localhost:8002').rstrip('/')
+
+        if cleaned.startswith('http://') or cleaned.startswith('https://'):
+            
+            return HttpResponseRedirect(cleaned)
+
+        target_url = urljoin(base + '/', cleaned.lstrip('/'))
+        logger.info("Proxying POST request to template service: %s", target_url)
+
+        resp, content_or_error = self._proxy_request(request, target_url, method='POST', data=request.data)
+        if resp is None:
+            return JsonResponse(
+                {'error': 'Template service unavailable for the requested action', 'details': str(content_or_error)},
+                status=502
+            )
+
+        content_type = resp.headers.get('Content-Type', 'application/octet-stream')
+        return HttpResponse(content_or_error, status=resp.status_code, content_type=content_type)
+            
+            

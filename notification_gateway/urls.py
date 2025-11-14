@@ -16,6 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from django.views.generic import TemplateView
 from gateway_api.views import (
     NotificationAPIView, 
     HealthCheckView, 
@@ -24,6 +25,7 @@ from gateway_api.views import (
     UserServiceView,
     InternalOrganizationSyncView,
     InternalOrganizationCreationView,
+    TemplateDocsProxyView,
 
 )
 from django_prometheus.exports import ExportToDjangoView
@@ -69,5 +71,8 @@ urlpatterns = [
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/',  SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    path('template-docs/', TemplateDocsProxyView.as_view(), name='template-docs-proxy-root'),
+    path('template-docs/<path:path>', TemplateDocsProxyView.as_view(), name='template-docs-proxy'),
+ 
  
 ]
