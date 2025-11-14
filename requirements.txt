@@ -38,3 +38,4 @@ uvicorn==0.38.0
 wheel==0.45.1
 yarl==1.22.0
 drf_spectacular
+gunicorn
