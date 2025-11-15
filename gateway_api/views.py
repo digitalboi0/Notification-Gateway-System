@@ -271,13 +271,13 @@ from asgiref.sync import sync_to_async
 import asyncio
 from django.utils.decorators import classonlymethod
 
-from rest_framework.views import BaseAPIView
+from rest_framework.views import APIView  # Swap to this—ditches the fictional BaseAPIView
 from rest_framework.response import Response  # If needed for type hints
 from asgiref.sync import sync_to_async
 import asyncio
 from django.utils.decorators import classonlymethod
 
-class AsyncAPIView(BaseAPIView):
+class AsyncAPIView(APIView):  # Inherit from APIView—empire-grade foundation
     """
     Custom APIView with async dispatch to handle async handlers (e.g., async def post).
     Awaits async methods seamlessly in ASGI environments.
@@ -285,7 +285,7 @@ class AsyncAPIView(BaseAPIView):
 
     @classonlymethod
     def as_view(cls, **initkwargs):
-        # Get the original sync view callable from BaseAPIView/APIVIew
+        # Get the original sync view callable from APIView
         sync_view = super(AsyncAPIView, cls).as_view(**initkwargs)
 
         # Wrap it in an async callable that awaits the result (which will be a coroutine)
