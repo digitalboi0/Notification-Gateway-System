@@ -271,6 +271,12 @@ from asgiref.sync import sync_to_async
 import asyncio
 from django.utils.decorators import classonlymethod
 
+from rest_framework.views import BaseAPIView
+from rest_framework.response import Response  # If needed for type hints
+from asgiref.sync import sync_to_async
+import asyncio
+from django.utils.decorators import classonlymethod
+
 class AsyncAPIView(BaseAPIView):
     """
     Custom APIView with async dispatch to handle async handlers (e.g., async def post).
@@ -316,38 +322,19 @@ class AsyncAPIView(BaseAPIView):
                 # If handler is sync, run it directly (or wrap in sync_to_async if it blocks I/O)
                 response = handler(request, *args, **kwargs)
 
-        except Exception as exc:
-            response = self.handle_exception(exc)  # handle_exception is sync; if needed, await sync_to_async
-
-        self.response = self.finalize_response(request, response, *args, **kwargs)
-        return self.response
-
-    async def dispatch(self, request, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-        request = self.initialize_request(request, *args, **kwargs)
-        self.request = request
-        self.headers = self.default_response_headers  
-
-        try:
-            await sync_to_async(self.initial)(request, *args, **kwargs)  
-
-            if request.method.lower() in self.http_method_names:
-                handler = getattr(self, request.method.lower(), self.http_method_not_allowed)
-            else:
-                handler = self.http_method_not_allowed
-
-            if asyncio.iscoroutinefunction(handler):
-                response = await handler(request, *args, **kwargs)  
-            else:
-                response = handler(request, *args, **kwargs)  
+            # Safety net: If a sync handler mistakenly returns a coroutine (forgotten await inside), await it here
+            if asyncio.iscoroutine(response):
+                response = await response
 
         except Exception as exc:
             response = self.handle_exception(exc)
 
+            # Safety net for exception handler, though unlikely
+            if asyncio.iscoroutine(response):
+                response = await response
+
         self.response = self.finalize_response(request, response, *args, **kwargs)
         return self.response
-
 
 
 
