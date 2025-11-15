@@ -933,8 +933,8 @@ class NotificationAPIView(AsyncAPIView):
 
 class NotificationStatusCheckView(AsyncAPIView):
     """POST /api/v1/notifications/status/ - Check notification status"""
-    authentication_classes = [APIKeyAuthentication]
-    permission_classes = [IsAuthenticated]
+    #authentication_classes = [APIKeyAuthentication]
+    #permission_classes = [IsAuthenticated]
     
     
     @extend_schema(
@@ -1055,7 +1055,7 @@ class InternalStatusView(AsyncAPIView):
     POST /internal/email/status/ - Email worker status updates
     POST /internal/push/status/ - Push worker status updates
     """
-    authentication_classes = [APIKeyAuthentication]
+    #authentication_classes = [APIKeyAuthentication]
     
     @extend_schema(
         operation_id='update_notification_status_internal',
@@ -1135,7 +1135,7 @@ class InternalStatusView(AsyncAPIView):
 
 class HealthCheckView(AsyncAPIView):
     """Health check endpoint - ASYNC VERSION"""
-    authentication_classes = [APIKeyAuthentication]
+    #authentication_classes = [APIKeyAuthentication]
     
     @extend_schema(
         operation_id='health_check',
@@ -1311,8 +1311,8 @@ class HealthCheckView(AsyncAPIView):
 
 class UserServiceView(APIView):
     
-    authentication_classes = [APIKeyAuthentication]
-    permission_classes = [IsAuthenticated]
+    #authentication_classes = [APIKeyAuthentication]
+    #permission_classes = [IsAuthenticated]
     
     
     
@@ -1697,7 +1697,7 @@ from django.conf import settings
 
 @method_decorator(csrf_exempt, name='dispatch')
 class InternalOrganizationSyncView(AsyncAPIView):
-    authentication_classes = [APIKeyAuthentication]
+    #authentication_classes = [APIKeyAuthentication]
     
     
     @extend_schema(
