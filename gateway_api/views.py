@@ -21,7 +21,7 @@ import httpx
 from aio_pika import connect_robust, Message, DeliveryMode
 from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
-from gateway_api.authentication import APIKeyAuthentication, InternalKeyAuthentication
+#from gateway_api.authentication import APIKeyAuthentication, InternalKeyAuthentication
 import subprocess
 
 from django.core.management import call_command
@@ -267,15 +267,60 @@ class InternalOrganizationCreationView(APIView):
                 'meta': get_standard_meta()
             }, status=http_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-
-
+from asgiref.sync import sync_to_async
+import asyncio
+from django.utils.decorators import classonlymethod
 
 class AsyncAPIView(BaseAPIView):
     """
     Custom APIView with async dispatch to handle async handlers (e.g., async def post).
     Awaits async methods seamlessly in ASGI environments.
     """
+
+    @classonlymethod
+    def as_view(cls, **initkwargs):
+        # Get the original sync view callable from BaseAPIView/APIVIew
+        sync_view = super(AsyncAPIView, cls).as_view(**initkwargs)
+
+        # Wrap it in an async callable that awaits the result (which will be a coroutine)
+        async def async_view(*args, **kwargs):
+            # sync_view will call dispatch (async) without await, returning coroutine—await it here
+            return await sync_view(*args, **kwargs)
+
+        # Preserve DRF's view attributes for routing/introspection
+        async_view.view_class = cls
+        async_view.view_initkwargs = initkwargs
+        async_view.csrf_exempt = True  # Optional: Exempt CSRF if API-only (from our earlier fix)
+
+        return async_view
+
+    async def dispatch(self, request, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+        request = self.initialize_request(request, *args, **kwargs)
+        self.request = request
+        self.headers = self.default_response_headers
+
+        try:
+            # initial() is sync (checks auth/perms/throttles)—run in thread
+            await sync_to_async(self.initial)(request, *args, **kwargs)
+
+            if request.method.lower() in self.http_method_names:
+                handler = getattr(self, request.method.lower(), self.http_method_not_allowed)
+            else:
+                handler = self.http_method_not_allowed
+
+            if asyncio.iscoroutinefunction(handler):
+                response = await handler(request, *args, **kwargs)
+            else:
+                # If handler is sync, run it directly (or wrap in sync_to_async if it blocks I/O)
+                response = handler(request, *args, **kwargs)
+
+        except Exception as exc:
+            response = self.handle_exception(exc)  # handle_exception is sync; if needed, await sync_to_async
+
+        self.response = self.finalize_response(request, response, *args, **kwargs)
+        return self.response
 
     async def dispatch(self, request, *args, **kwargs):
         self.args = args
@@ -302,7 +347,6 @@ class AsyncAPIView(BaseAPIView):
 
         self.response = self.finalize_response(request, response, *args, **kwargs)
         return self.response
-
 
 
 
