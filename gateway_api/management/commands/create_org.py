@@ -135,7 +135,7 @@ class Command(BaseCommand):
 
             
             
-            gateway_internal_url = f"http://localhost:8002/internal/organizations/create-template-org/" 
+            gateway_internal_url = settings.TEMPLATE_SERVICE_URL 
             response = requests.post(
                 gateway_internal_url,
                 json=org_data,
