@@ -21,7 +21,7 @@ import httpx
 from aio_pika import connect_robust, Message, DeliveryMode
 from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
-#from gateway_api.authentication import APIKeyAuthentication, InternalKeyAuthentication
+from gateway_api.authentication import APIKeyAuthentication, InternalKeyAuthentication
 import subprocess
 
 from django.core.management import call_command
