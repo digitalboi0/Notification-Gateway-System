@@ -829,13 +829,15 @@ class NotificationAPIView(AsyncAPIView):
             async with httpx.AsyncClient(timeout=3.0) as client:
                 
                 response = await client.get (
+                    
                     f"{settings.USER_SERVICE_URL}/users/{user_id}",
+                    
                     headers={
                         'X-Organization-ID': org_id,
                         'X-Correlation-ID': correlation_id,
                         'Content-Type': 'application/json',
                         'X-Internal-Secret': settings.INTERNAL_API_SECRET,
-                        'X-API-Key': api_key
+                       # 'X-API-Key': api_key,
 
                     },
                     timeout=3
@@ -1800,6 +1802,8 @@ class InternalOrganizationSyncView(AsyncAPIView):
 
 class TemplateDocsProxyView(APIView):
     """
+    
+    
     Proxy view to forward requests to the Template Service's Swagger UI.
     Adds the required X-Internal-Secret header for the template service's internal endpoints.
     Intended for internal access (e.g., by developers/admins via the gateway).
