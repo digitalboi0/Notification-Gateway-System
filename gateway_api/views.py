@@ -28,7 +28,7 @@ from django.core.management import call_command
 from io import StringIO
 from contextlib import redirect_stdout
 import sys
-#from rest_framework.permissions import IsAuthenticated 
+from rest_framework.permissions import IsAuthenticated 
 
 from .rabbitmq import get_channel
 
@@ -47,7 +47,7 @@ from gateway_api.serializers import (
     OrganizationSerializer,
     HealthCheckSerializer,
 )
-
+from django.views.decorators.csrf import csrf_exempt
 
 logger = logging.getLogger(__name__)
 
@@ -169,8 +169,9 @@ class InternalOrganizationCreationView(APIView):
                     OpenApiExample(
                         'Success',)])}
     )
+    
             
-
+    @csrf_exempt
     def post(self, request):
         """Receive organization details and run the create_org command."""
         try:
@@ -436,8 +437,8 @@ class NotificationAPIView(AsyncAPIView):
     """
     
     
-    #authentication_classes = [APIKeyAuthentication]
-    #permission_classes = [IsAuthenticated]
+    authentication_classes = [APIKeyAuthentication]
+    permission_classes = [IsAuthenticated]
     
     
     @extend_schema(
@@ -535,7 +536,7 @@ class NotificationAPIView(AsyncAPIView):
             ),
         ]
     )
-    
+    @csrf_exempt
     async  def post(self, request):
         """Create a new notification request"""
         redis_client = await get_redis_client() 
@@ -554,21 +555,20 @@ class NotificationAPIView(AsyncAPIView):
                 request_id = request.data.get('request_id', secrets.token_urlsafe(16))
                 priority = request.data.get('priority', 5)
                 metadata = request.data.get('metadata', {})
-                api_key = request.headers.get('X-API-Key') 
-                api_key = str(api_key) 
+                api_key = request.headers.get('X-API-Key')
                 
                 
-                #if hasattr(request, 'user') and hasattr(request.user, 'organization_id'):
-                 #   org_id = request.user.organization_id
-                  #  org_prefix = org_id[:8] if org_id else 'unknown'
-                #else:
-                 #   NOTIFICATIONS_REJECTED.labels(reason='unauthenticated', org_id_prefix='unauthenticated').inc()
-                 #  return Response({
-                    #    'success': False,
-                    #    'error': 'Authentication required',
-                    #    'message': 'X-API-Key header is required',
-                    #    'meta': get_standard_meta()
-                    #}, status=http_status.HTTP_401_UNAUTHORIZED)
+                if hasattr(request, 'user') and hasattr(request.user, 'organization_id'):
+                    org_id = request.user.organization_id
+                    org_prefix = org_id[:8] if org_id else 'unknown'
+                else:
+                    NOTIFICATIONS_REJECTED.labels(reason='unauthenticated', org_id_prefix='unauthenticated').inc()
+                    return Response({
+                        'success': False,
+                        'error': 'Authentication required',
+                        'message': 'X-API-Key header is required',
+                        'meta': get_standard_meta()
+                    }, status=http_status.HTTP_401_UNAUTHORIZED)
 
                 
                 if not all([notification_type, user_id, template_code]):
@@ -829,15 +829,13 @@ class NotificationAPIView(AsyncAPIView):
             async with httpx.AsyncClient(timeout=3.0) as client:
                 
                 response = await client.get (
-                    
                     f"{settings.USER_SERVICE_URL}/users/{user_id}",
-                    
                     headers={
                         'X-Organization-ID': org_id,
                         'X-Correlation-ID': correlation_id,
                         'Content-Type': 'application/json',
                         'X-Internal-Secret': settings.INTERNAL_API_SECRET,
-                       # 'X-API-Key': api_key,
+                        'X-API-Key': api_key
 
                     },
                     timeout=3
@@ -936,8 +934,8 @@ class NotificationAPIView(AsyncAPIView):
 
 class NotificationStatusCheckView(AsyncAPIView):
     """POST /api/v1/notifications/status/ - Check notification status"""
-    #authentication_classes = [APIKeyAuthentication]
-    #permission_classes = [IsAuthenticated]
+    authentication_classes = [APIKeyAuthentication]
+    permission_classes = [IsAuthenticated]
     
     
     @extend_schema(
@@ -1102,6 +1100,7 @@ class InternalStatusView(AsyncAPIView):
             ),
         ]
     )
+    @csrf_exempt
     async def post(self, request, notification_type):
         
         if request.headers.get('X-Internal-Secret') != os.getenv('INTERNAL_API_SECRET'):
@@ -1206,6 +1205,7 @@ class HealthCheckView(AsyncAPIView):
             ),
         }
     )
+    @csrf_exempt
     async def get(self, request):
         health_status = {
             'service': 'api-gateway',
@@ -1802,8 +1802,6 @@ class InternalOrganizationSyncView(AsyncAPIView):
 
 class TemplateDocsProxyView(APIView):
     """
-    
-    
     Proxy view to forward requests to the Template Service's Swagger UI.
     Adds the required X-Internal-Secret header for the template service's internal endpoints.
     Intended for internal access (e.g., by developers/admins via the gateway).
