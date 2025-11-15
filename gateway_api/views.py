@@ -554,7 +554,8 @@ class NotificationAPIView(AsyncAPIView):
                 request_id = request.data.get('request_id', secrets.token_urlsafe(16))
                 priority = request.data.get('priority', 5)
                 metadata = request.data.get('metadata', {})
-                api_key = request.headers.get('X-API-Key')  
+                api_key = request.headers.get('X-API-Key') 
+                api_key = str(api_key) 
                 
                 
                 #if hasattr(request, 'user') and hasattr(request.user, 'organization_id'):
